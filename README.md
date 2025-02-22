@@ -16,8 +16,14 @@ An alternative to [warcraftrecorder](https://warcraftrecorder.com) on linux.
 
 On the first run, `progrs` will note you don't have a configuration file, and
 create one for you. It's probably `~/.config/progrs/config.tml`. You will need
-to edit that, at least put in the necessary values for `watchdir` and `viddir`.
-It is well commented, please look around and ajust as necessary.
+to edit that, at least put in the necessary values for `watchdir` (the `Log`
+directory of your WoW installation) and `viddir` (the directory where the
+videos will end up). It is well commented, please look around and ajust as
+necessary.
+
+*Important*: Don't forget to enable advanced combat logging. For now, only
+"encounters" are supported, which does at least mean raid bosses, but might
+include M+ bosses.
 
 ## Contributing
 
