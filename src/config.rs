@@ -1,16 +1,16 @@
 pub struct Config {
-  pub watchdir: &'static str,
-  pub viddir: &'static str,
-  pub command: &'static str,
-  pub mkvmerge: &'static str,
+  pub watchdir: String,
+  pub viddir: String,
+  pub command: String,
+  pub mkvmerge: Option<String>,
 }
 
 impl Config {
   pub fn new(
-    viddir: &'static str,
-    watchdir: &'static str,
-    command: &'static str,
-    mkvmerge: &'static str,
+    viddir: String,
+    watchdir: String,
+    command: String,
+    mkvmerge: Option<String>,
   ) -> Self {
     Self {
       viddir,

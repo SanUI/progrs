@@ -14,7 +14,7 @@ use nix::{
 pub struct Recorder {
   pub viddir: String,
   pub command: String,
-  pub mkvmerge: String,
+  pub mkvmerge: Option<String>,
   pub recording: Option<Recording>,
 }
 
@@ -26,7 +26,11 @@ pub struct Recording {
 }
 
 impl Recorder {
-  pub fn new(viddir: String, command: String, mkvmerge: String) -> Self {
+  pub fn new(
+    viddir: String,
+    command: String,
+    mkvmerge: Option<String>,
+  ) -> Self {
     Self {
       viddir,
       command,
@@ -88,25 +92,27 @@ impl Recorder {
       let exitstatus = process.wait().expect("Waiting for recorder exit");
       println!("Recorder exited with status {exitstatus}");
 
-      let chapterfile = format!("{viddir}/{filename}.txt");
-      fs::write(&chapterfile, deaths).expect("Writing chapter file");
+      if let Some(mergecommand) = mkvmerge {
+        let chapterfile = format!("{viddir}/{filename}.txt");
+        fs::write(&chapterfile, deaths).expect("Writing chapter file");
 
-      let mkvfile = format!("{viddir}/{filename}.mkv");
-      let outfile = format!("{viddir}/{filename}_final.mkv");
+        let mkvfile = format!("{viddir}/{filename}.mkv");
+        let outfile = format!("{viddir}/{filename}_final.mkv");
 
-      let merger = Command::new(mkvmerge)
-        .args(["--chapters", &chapterfile])
-        .args(["-o", &outfile])
-        .args([&mkvfile])
-        .stdout(Stdio::null())
-        .output()
-        .expect("Merging failed");
-      io::stderr()
-        .write_all(&merger.stderr)
-        .expect("Writing stderr");
+        let merger = Command::new(mergecommand)
+          .args(["--chapters", &chapterfile])
+          .args(["-o", &outfile])
+          .args([&mkvfile])
+          .stdout(Stdio::null())
+          .output()
+          .expect("Merging failed");
+        io::stderr()
+          .write_all(&merger.stderr)
+          .expect("Writing stderr");
 
-      //remove_file(&mkvfile).unwrap();
-      //remove_file(&chapterfile).unwrap();
+        //remove_file(&mkvfile).unwrap();
+        //remove_file(&chapterfile).unwrap();
+      }
     });
   }
 }

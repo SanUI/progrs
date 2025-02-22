@@ -17,14 +17,14 @@ pub mod parser;
 pub mod recorder;
 
 pub async fn main() -> Result<(), io::Error> {
-  let conf = config::Config::new(WATCHDIR, VIDDIR, COMMAND, MKVMERGE);
+  let conf = config::Config::new(WATCHDIR.into(), VIDDIR.into(), COMMAND.into(), Some(MKVMERGE.into()));
 
   let mut recorder = Recorder::new(
-    conf.viddir.into(),
-    conf.command.into(),
-    conf.mkvmerge.into(),
+    conf.viddir,
+    conf.command,
+    conf.mkvmerge,
   );
-  let mut dirwatcher = DirWatcher::at(conf.watchdir)?;
+  let mut dirwatcher = DirWatcher::at(&conf.watchdir)?;
 
   while let Some(e) = dirwatcher.recv().await {
     println!("Event: '{e:?}'");
