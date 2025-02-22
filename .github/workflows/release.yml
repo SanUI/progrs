@@ -15,7 +15,7 @@ jobs:
 
     - name: Setup toolchain
       run: |
-        rustup toolchain install x86_64-unknown-linux-musl --no-self-update
+        rustup target add x86_64-unknown-linux-musl
         rustup update
         cargo --version
         rustup show
