@@ -11,6 +11,8 @@ use nix::{
   unistd::Pid,
 };
 
+use crate::config::executable;
+
 pub struct Recorder {
   pub viddir: String,
   pub command: String,
@@ -29,12 +31,18 @@ impl Recorder {
   pub fn new(
     viddir: String,
     command: String,
-    mkvmerge: Option<String>,
+    mkvmerge: String,
   ) -> Self {
+    let mut mkvm = None;
+
+    if executable(&mkvmerge).is_ok() {
+      mkvm = Some(mkvmerge);
+    }
+
     Self {
       viddir,
       command,
-      mkvmerge,
+      mkvmerge: mkvm,
       recording: None,
     }
   }

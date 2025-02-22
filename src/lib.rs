@@ -1,13 +1,12 @@
-use std::io;
+use std::{error::Error, fs::{self, create_dir_all}, io, path::Path};
 
+use config::ProgrsConfig;
+use confique::{toml::template, Config, toml::FormatOptions};
 use dirwatcher::DirWatcher;
 use recorder::Recorder;
+use directories::ProjectDirs;
 
-const WATCHDIR: &str = "/home/pips/tmp"; //"/home/pips/Games/WoW/World of Warcraft/_retail_/Logs";
-const PREFIX: &[u8] = b"W"; //b"WoWCombatLog-";
-const VIDDIR: &str = "/home/pips/tmp";
-const COMMAND: &str = "/usr/bin/gpu-screen-recorder";
-const MKVMERGE: &str = "/usr/bin/mkvmerge";
+const PREFIX: &[u8] = b"WoWCombatLog-";
 
 pub mod config;
 //pub mod follow;
@@ -17,11 +16,43 @@ pub mod parser;
 pub mod recorder;
 
 pub async fn main() -> Result<(), io::Error> {
-  let conf = config::Config::new(WATCHDIR.into(), VIDDIR.into(), COMMAND.into(), Some(MKVMERGE.into()));
+  let Some(dirs) = ProjectDirs::from("", "", "progrs") else {
+    return Err(io::Error::other("Could not determine config directory, exiting"));
+  };
+  let confdir = dirs.config_dir();
+  if create_dir_all(&confdir).is_err() {
+    return Err(io::Error::other("Could not create config directory, exiting"));
+  }
+
+  let conffile = Path::new(&confdir).join("config.toml");
+
+  if !(fs::exists(&conffile)?) {
+    println!("Config file {} does not exist, creating with default values. \
+    Please adjust to your needs and run progrs again",
+    conffile.to_string_lossy());
+
+    let toml = template::<ProgrsConfig>(FormatOptions::default());
+    fs::write(&conffile, &toml)?;
+    return Ok(());
+  };
+
+  let conf = match ProgrsConfig::from_file(&conffile) {
+    Ok(c) => c,
+    Err(e) => {
+      eprintln!("Error: {e}");
+
+      let mut e: &dyn Error = &e;
+      while let Some(err) = e.source() {
+        eprintln!("Because of: {err}");
+        e = err;
+      }
+    return Err(io::Error::other("Error reading config file"));
+    }
+  };
 
   let mut recorder = Recorder::new(
     conf.viddir,
-    conf.command,
+    conf.recorder.command,
     conf.mkvmerge,
   );
   let mut dirwatcher = DirWatcher::at(&conf.watchdir)?;

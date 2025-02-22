@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4.39"
+confique = { version = "0.3.0", features = ["toml"] }
+directories = "6.0.0"
 futures-util = "0.3.31"
 inotify = "0.11.0"
 memchr = "2.7.4"
