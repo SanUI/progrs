@@ -1,0 +1,12 @@
+[package]
+name = "progrs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chrono = "0.4.39"
+futures-util = "0.3.31"
+inotify = "0.11.0"
+memchr = "2.7.4"
+nix = { version = "0.29.0", features = ["signal"] }
+tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread", "sync"] }
