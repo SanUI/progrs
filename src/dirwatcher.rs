@@ -115,8 +115,8 @@ impl DirWatcher {
     } else {
       parsebuf.clear();
     }
-    println!("Remaining buffer: '{}'", String::from_utf8_lossy(parsebuf));
-    println!("----------");
+    //println!("Remaining buffer: '{}'", String::from_utf8_lossy(parsebuf));
+    //println!("----------");
   }
 }
 
