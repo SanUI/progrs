@@ -18,6 +18,14 @@ impl Parser {
     Parser {}
   }
 
+  /// Parse the events in `buffer` into `Event`s and send them through the
+  /// channel
+  ///
+  /// * Advances start of buffer behind parsed stuff, does not modify buffer end
+  /// * Should work correctly even if several ENCOUNTER_START/ENCOUNTER_END
+  ///   events are present (will swallow up the events that are superflous here)
+  /// 
+  /// Very adhoc, might need to rethink this later
   pub async fn parse(&self, buffer: &mut &[u8], tx: Sender<Event>) {
     let startit = memmem::find_iter(buffer, "ENCOUNTER_START");
 
@@ -63,6 +71,8 @@ impl Parser {
     }
   }
 
+  /// Parses the UNIT_DIED events in `buffer`, send the events through the
+  /// channel. Does not adjust buffer's start. Filters out uninteresting events.
   async fn handle_deaths(&self, buffer: &[u8], tx: &Sender<Event>) {
     let it = memmem::find_iter(buffer, "UNIT_DIED");
 
@@ -81,10 +91,8 @@ impl Parser {
           memchr::memchr(b'"', &line[nstart + 1..]).expect("Player name");
 
         let flagstart = nstart + nend + 3;
-        let flagend = memchr::memchr(b',', &line[flagstart..]).expect(
-          "Player
-        flags",
-        );
+        let flagend =
+          memchr::memchr(b',', &line[flagstart..]).expect("Player flags");
         let flag = str::from_utf8(&line[flagstart..flagstart + flagend])
           .expect("Player flag");
         let flag = flag.strip_prefix("0x").expect("Hexadecimal");
@@ -103,7 +111,6 @@ impl Parser {
         {
           let name =
             String::from_utf8_lossy(&line[nstart + 1..nstart + nend + 1]);
-          println!("Got death: {name}");
           tx.send(Event::PlayerDeath(datetime, name.to_string()))
             .await
             .expect("Event channel");
@@ -112,10 +119,12 @@ impl Parser {
     }
   }
 
+  /// Advances buffer start behind the last line containing ENCOUNTER_END
+  /// Returns true if it DID find such a line, false otherwise
   fn skip_encounter_end(&self, buffer: &mut &[u8]) -> bool {
-    let endit = memmem::find_iter(buffer, "ENCOUNTER_END");
+    let mut endit = memmem::rfind_iter(buffer, "ENCOUNTER_END");
 
-    if let Some(endidx) = endit.last() {
+    if let Some(endidx) = endit.next() {
       *buffer = &buffer[endidx..];
       self.skip_to_next_line(buffer);
       true
@@ -124,6 +133,7 @@ impl Parser {
     }
   }
 
+  /// Advance the start of the buffer behind the next b'\n'
   fn skip_to_next_line(&self, buffer: &mut &[u8]) {
     if buffer.is_empty() {
       return;
@@ -142,6 +152,10 @@ impl Parser {
   }
 }
 
+/// Returns the encounter name, blanks are replaced by underscores. Does not
+/// adjust line's start
+///
+/// Probably only works correctly on lines containing ENCOUNTER_START
 fn encounter_from_line(line: &mut &[u8]) -> String {
   let firstmark = memchr(b'"', line).expect("ENCOUNTER_START name format");
   let secondmark =
@@ -154,6 +168,7 @@ fn encounter_from_line(line: &mut &[u8]) -> String {
   String::from_utf8(v).expect("Valid UTF8")
 }
 
+/// Returns the Datetime of a log entry. Does not adjust line's start.
 fn datetime_from_line(line: &mut &[u8]) -> NaiveDateTime {
   let firstblank = memchr(b' ', line).expect("Log Time Format");
   let secondblank =
