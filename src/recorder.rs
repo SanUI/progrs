@@ -1,6 +1,6 @@
 use std::{
   fmt::Write as FmtWrite,
-  fs,
+  fs::{self, remove_file},
   io::{self, Write},
   process::{Child, Command, Stdio},
 };
@@ -118,8 +118,8 @@ impl Recorder {
           .write_all(&merger.stderr)
           .expect("Writing stderr");
 
-        //remove_file(&mkvfile).unwrap();
-        //remove_file(&chapterfile).unwrap();
+        remove_file(&mkvfile).expect("File was created");
+        remove_file(&chapterfile).expect("File was created");
       }
     });
   }
