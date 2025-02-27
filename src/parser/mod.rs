@@ -6,6 +6,10 @@ use tokio::sync::mpsc::Sender;
 
 use crate::events::Event;
 
+mod flags;
+
+use flags::{Flags, HasFlag};
+
 #[derive(Default)]
 pub struct Parser {}
 
@@ -75,11 +79,35 @@ impl Parser {
         let nstart = memchr::memchr(b'"', line).expect("Player name");
         let nend =
           memchr::memchr(b'"', &line[nstart + 1..]).expect("Player name");
-        let name =
-          String::from_utf8_lossy(&line[nstart + 1..nstart + nend + 1]);
-        tx.send(Event::PlayerDeath(datetime, name.to_string()))
-          .await
-          .expect("Event channel");
+
+        let flagstart = nstart + nend + 3;
+        let flagend = memchr::memchr(b',', &line[flagstart..]).expect(
+          "Player
+        flags",
+        );
+        let flag = str::from_utf8(&line[flagstart..flagstart + flagend])
+          .expect("Player flag");
+        let flag = flag.strip_prefix("0x").expect("Hexadecimal");
+        let flag = i32::from_str_radix(flag, 16).expect("Player flags");
+
+        // UnitUnconsciousAtDeath
+        // -2 because of windows' line endings, -1 in case we're at the end of
+        // the buffer
+        // No false positives because of short-circuiting
+        let line_ends_with_0 =
+          buffer[lineend - 1] == b'0' || buffer[lineend - 2] == b'0';
+
+        if flag.has_flag(Flags::ControlPlayer)
+          && flag.has_flag(Flags::TypePlayer)
+          && line_ends_with_0
+        {
+          let name =
+            String::from_utf8_lossy(&line[nstart + 1..nstart + nend + 1]);
+          println!("Got death: {name}");
+          tx.send(Event::PlayerDeath(datetime, name.to_string()))
+            .await
+            .expect("Event channel");
+        }
       }
     }
   }
