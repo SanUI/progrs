@@ -1,7 +1,6 @@
 use std::{
   fmt::{Display, Write as FmtWrite},
   fs::{self, remove_file},
-  io::{self, Write},
   process::{Child, Command, Stdio},
 };
 
@@ -115,7 +114,11 @@ impl Recorder {
       .expect("Killing process failed");
 
       let exitstatus = process.wait().expect("Waiting for recorder exit");
-      println!("Recorder exited with status {exitstatus}");
+
+      if !exitstatus.success() {
+        println!("Recorder exited with status {exitstatus}");
+        return;
+      }
 
       if let Some(mergecommand) = mkvmerge {
         let chapterfile = format!("{viddir}/{filename}.txt");
@@ -124,19 +127,21 @@ impl Recorder {
         let mkvfile = format!("{viddir}/{filename}.mkv");
         let outfile = format!("{viddir}/{filename}_final.mkv");
 
-        let merger = Command::new(mergecommand)
+        let mergestatus = Command::new(mergecommand)
           .args(["--chapters", &chapterfile])
           .args(["-o", &outfile])
           .args([&mkvfile])
           .stdout(Stdio::null())
-          .output()
+          .status()
           .expect("Merging failed");
-        io::stderr()
-          .write_all(&merger.stderr)
-          .expect("Writing stderr");
 
-        remove_file(&mkvfile).expect("File was created");
-        remove_file(&chapterfile).expect("File was created");
+        if mergestatus.success() {
+          remove_file(&mkvfile).expect("File was created");
+          remove_file(&chapterfile).expect("File was created");
+        } else {
+          println!("Merge exited with status {mergestatus}, keeping \
+                    intermediate files");
+        }
       }
     });
   }

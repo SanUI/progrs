@@ -22,13 +22,13 @@ impl Parser {
   /// channel
   ///
   /// * Advances start of buffer behind parsed stuff, does not modify buffer end
-  /// * Should work correctly even if several ENCOUNTER_START/ENCOUNTER_END
+  /// * Should work correctly even if several ENCOUNTER_START/ENCOUNTER_END etc.
   ///   events are present (will swallow up the events that are superflous here)
-  /// 
+  ///
   /// Very adhoc, might need to rethink this later
   pub async fn parse(&self, buffer: &mut &[u8], tx: Sender<Event>) {
+    // handle ENCOUNTER_START
     let startit = memmem::find_iter(buffer, "ENCOUNTER_START");
-
     if let Some(startidx) = startit.last() {
       // Have the buffer start at the start of this line
       // If '\n' isn't found, this is the first line, so just keep the buffer
@@ -36,7 +36,7 @@ impl Parser {
         *buffer = &buffer[nidx + 1..];
       }
 
-      if self.skip_encounter_end(buffer) {
+      if self.skip_behind(buffer, "ENCOUNTER_END") {
         return;
       }
 
@@ -49,6 +49,31 @@ impl Parser {
         .expect("Event channel");
 
       self.skip_to_next_line(buffer);
+    } else {
+      //handle CHALLENGE_MODE_START
+      let startit = memmem::find_iter(buffer, "CHALLENGE_MODE_START");
+
+      if let Some(startidx) = startit.last() {
+        // Have the buffer start at the start of this line
+        // If '\n' isn't found, this is the first line, so just keep the buffer
+        if let Some(nidx) = memrchr(b'\n', &buffer[..startidx]) {
+          *buffer = &buffer[nidx + 1..];
+        }
+
+        if self.skip_behind(buffer, "CHALLENGE_MODE_END") {
+          return;
+        }
+
+        // This is the important part: ENCOUNTER_START, but not ENCOUNTER_END
+        let dt = datetime_from_line(buffer);
+        let dungeon = dungeon_from_line(buffer);
+
+        tx.send(Event::ChallengeModeStart(dt, dungeon))
+          .await
+          .expect("Event channel");
+
+        self.skip_to_next_line(buffer);
+      }
     }
 
     if let Some(endidx) = memmem::find_iter(buffer, "ENCOUNTER_END").next() {
@@ -56,8 +81,13 @@ impl Parser {
       tx.send(Event::EncounterEnd).await.expect("Event channel");
       *buffer = &buffer[endidx..];
       self.skip_to_next_line(buffer);
+    } else if let Some(endidx) = memmem::find_iter(buffer, "CHALLENGE_MODE_END").next() {
+      self.handle_deaths(&buffer[..endidx], &tx).await;
+      tx.send(Event::ChallengeModeEnd).await.expect("Event channel");
+      *buffer = &buffer[endidx..];
+      self.skip_to_next_line(buffer);
     } else {
-      // No ENCOUNTER_END -> just handle deaths
+      // No *_END -> just handle deaths
       self.handle_deaths(buffer, &tx).await;
     }
 
@@ -119,10 +149,10 @@ impl Parser {
     }
   }
 
-  /// Advances buffer start behind the last line containing ENCOUNTER_END
+  /// Advances buffer start behind the last line containing marker
   /// Returns true if it DID find such a line, false otherwise
-  fn skip_encounter_end(&self, buffer: &mut &[u8]) -> bool {
-    let mut endit = memmem::rfind_iter(buffer, "ENCOUNTER_END");
+  fn skip_behind(&self, buffer: &mut &[u8], marker: &'static str) -> bool {
+    let mut endit = memmem::rfind_iter(buffer, marker);
 
     if let Some(endidx) = endit.next() {
       *buffer = &buffer[endidx..];
@@ -160,6 +190,22 @@ fn encounter_from_line(line: &mut &[u8]) -> String {
   let firstmark = memchr(b'"', line).expect("ENCOUNTER_START name format");
   let secondmark =
     memchr(b'"', &line[firstmark + 1..]).expect("ENCOUNTER_START name format");
+  let v: Vec<u8> = line[firstmark + 1..firstmark + secondmark + 1]
+    .iter()
+    .map(|c| if c == &b' ' { b'_' } else { *c })
+    .collect();
+
+  String::from_utf8(v).expect("Valid UTF8")
+}
+///
+/// Returns the dungeon name, blanks are replaced by underscores. Does not
+/// adjust line's start
+///
+/// Probably only works correctly on lines containing CHALLENGE_MODE_START
+fn dungeon_from_line(line: &mut &[u8]) -> String {
+  let firstmark = memchr(b'"', line).expect("CHALLENGE_MODE_START name format");
+  let secondmark = memchr(b'"', &line[firstmark + 1..])
+    .expect("CHALLENGE_MODE_START name format");
   let v: Vec<u8> = line[firstmark + 1..firstmark + secondmark + 1]
     .iter()
     .map(|c| if c == &b' ' { b'_' } else { *c })
