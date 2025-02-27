@@ -1,5 +1,5 @@
 use std::{
-  fmt::Write as FmtWrite,
+  fmt::{Display, Write as FmtWrite},
   fs::{self, remove_file},
   io::{self, Write},
   process::{Child, Command, Stdio},
@@ -11,7 +11,7 @@ use nix::{
   unistd::Pid,
 };
 
-use crate::config::executable;
+use crate::{config::executable, events::Event};
 
 pub struct Recorder {
   pub viddir: String,
@@ -23,9 +23,26 @@ pub struct Recorder {
 pub struct Recording {
   starttime: NaiveDateTime,
   filename: String,
-  deaths: Vec<(NaiveDateTime, String)>,
+  events: Vec<Event>,
   process: Child,
+  pub activity: Activity,
 }
+
+pub enum Activity {
+  /// Raidboss with name
+  Raid(String),
+  /// Mythic+ Dungeon with dungeon name
+  MythicPlus(String)
+}
+
+impl Display for Activity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+      match self {
+        Self::Raid(s) | Self::MythicPlus(s) => write!(f, "{s}")
+      }
+    }
+}
+
 
 impl Recorder {
   pub fn new(
@@ -47,12 +64,12 @@ impl Recorder {
     }
   }
 
-  pub fn start_recording(&mut self, time: NaiveDateTime, filename: String) {
+  pub fn start_recording(&mut self, time: NaiveDateTime, activity: Activity) {
+    let datetimestr = time.format("%Y%m%d_%H%M%S");
+    let filename = format!("{datetimestr}_{activity}");
     println!("Recording into {filename}");
     let viddir = &self.viddir;
 
-    let datetimestr = time.format("%Y%m%d_%H%M%S");
-    let filename = format!("{datetimestr}_{filename}");
 
     let recorder = Command::new(&self.command)
       .args(["-w", "DisplayPort-0"])
@@ -72,7 +89,7 @@ impl Recorder {
       .spawn()
       .expect("Spawning gpu-screen-recorder");
 
-    let recording = Recording::new(time, filename, recorder);
+    let recording = Recording::new(time, filename, recorder, activity);
     self.recording = Some(recording);
   }
 
@@ -130,36 +147,77 @@ impl Recording {
     starttime: NaiveDateTime,
     filename: String,
     process: Child,
+    activity: Activity
   ) -> Self {
     Self {
       starttime,
       filename,
-      deaths: vec![],
+      events: vec![],
       process,
+      activity
+    }
+  }
+
+  pub fn is_raid(&self) -> bool {
+    match self.activity {
+      Activity::Raid(_) => true,
+      Activity::MythicPlus(_) => false
+    }
+  }
+
+  pub fn is_mythicplus(&self) -> bool {
+    match self.activity {
+      Activity::Raid(_) => false,
+      Activity::MythicPlus(_) => true
     }
   }
 
   pub fn add_death(&mut self, datetime: NaiveDateTime, name: String) {
-    self.deaths.push((datetime, name));
+    self.events.push(Event::PlayerDeath(datetime, name));
+  }
+
+  pub fn add_encounter(&mut self, datetime: NaiveDateTime, name: String) {
+    self.events.push(Event::EncounterStart(datetime, name));
   }
 
   pub fn create_chapters(&self, starttime: &NaiveDateTime) -> String {
     let mut s = String::new();
 
-    for (idx, (time, name)) in self.deaths.iter().enumerate() {
-      let tdelta = *time - *starttime;
-      writeln!(
-        &mut s,
-        "CHAPTER{:02}={:02}:{:02}:{:02}.{:03}",
-        idx + 1,
-        tdelta.num_hours(),
-        tdelta.num_minutes() % 60,
-        tdelta.num_seconds() % 60,
-        tdelta.num_milliseconds() % 1000
-      )
-      .expect("Write into String");
-      writeln!(&mut s, "CHAPTER{:02}NAME={name}", idx + 1)
-        .expect("Write into String");
+    for (idx, event) in self.events.iter().enumerate() {
+      match event {
+        Event::PlayerDeath(time, name) => {
+          let tdelta = *time - *starttime;
+          writeln!(
+            &mut s,
+            "CHAPTER{:02}={:02}:{:02}:{:02}.{:03}",
+            idx + 1,
+            tdelta.num_hours(),
+            tdelta.num_minutes() % 60,
+            tdelta.num_seconds() % 60,
+            tdelta.num_milliseconds() % 1000
+          )
+          .expect("Write into String");
+          writeln!(&mut s, "CHAPTER{:02}NAME=Death: {name}", idx + 1)
+            .expect("Write into String");
+        }
+        Event::EncounterStart(time, name) => {
+          let tdelta = *time - *starttime;
+          writeln!(
+            &mut s,
+            "CHAPTER{:02}={:02}:{:02}:{:02}.{:03}",
+            idx + 1,
+            tdelta.num_hours(),
+            tdelta.num_minutes() % 60,
+            tdelta.num_seconds() % 60,
+            tdelta.num_milliseconds() % 1000
+          )
+          .expect("Write into String");
+          writeln!(&mut s, "CHAPTER{:02}NAME=Encounter Start: {name}", idx + 1)
+            .expect("Write into String");
+        }
+        // We don't push anything else anyways
+        _ => {}
+      }
     }
 
     s

@@ -3,7 +3,7 @@ use std::{error::Error, fs::{self, create_dir_all}, io, path::Path};
 use config::ProgrsConfig;
 use confique::{toml::template, Config, toml::FormatOptions};
 use dirwatcher::DirWatcher;
-use recorder::Recorder;
+use recorder::{Activity, Recorder};
 use directories::ProjectDirs;
 
 const PREFIX: &[u8] = b"WoWCombatLog-";
@@ -64,9 +64,21 @@ pub async fn main() -> Result<(), io::Error> {
       use events::Event::*;
       match e {
         EncounterStart(datetime, name) => {
-          recorder.start_recording(datetime, name);
+          let Some(recording) = recorder.recording.as_mut() else {
+              recorder.start_recording(datetime, Activity::Raid(name));
+              continue;
+          };
+
+
+          if recording.is_mythicplus() {
+            recording.add_encounter(datetime, name);
+          }
         }
-        EncounterEnd => recorder.stop_recording(),
+        EncounterEnd => {
+          if Some(true) == recorder.recording.as_ref().map(|r| r.is_raid()) {
+            recorder.stop_recording();
+          }
+        }
         PlayerDeath(datetime, name) => {
           if let Some(r) = recorder.recording.as_mut() {
             r.add_death(datetime, name);
