@@ -11,4 +11,6 @@ pub enum Event {
   ChallengeModeEnd,
   //  NewFile(PathBuf),
   IoErr(io::Error),
+  // Ctrl-C was pressed
+  CtrlC,
 }

@@ -98,7 +98,7 @@ impl Recorder {
       return;
     };
 
-    let deaths = recording.create_chapters(&recording.starttime);
+    let chapters = recording.create_chapters(&recording.starttime);
     let filename = recording.filename;
     let viddir = self.viddir.clone();
     let mut process = recording.process;
@@ -120,9 +120,14 @@ impl Recorder {
         return;
       }
 
+      if chapters.is_empty() {
+        println!("No events during recording, nothing to merge");
+        return;
+      }
+
       if let Some(mergecommand) = mkvmerge {
         let chapterfile = format!("{viddir}/{filename}.txt");
-        fs::write(&chapterfile, deaths).expect("Writing chapter file");
+        fs::write(&chapterfile, chapters).expect("Writing chapter file");
 
         let mkvfile = format!("{viddir}/{filename}.mkv");
         let outfile = format!("{viddir}/{filename}_final.mkv");

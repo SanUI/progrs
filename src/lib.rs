@@ -7,6 +7,7 @@ use std::{
 
 use config::ProgrsConfig;
 use confique::{toml::template, toml::FormatOptions, Config};
+use ctrlc;
 use directories::ProjectDirs;
 use dirwatcher::DirWatcher;
 use recorder::{Activity, Recorder};
@@ -63,7 +64,13 @@ pub async fn main() -> Result<(), io::Error> {
 
   let mut recorder =
     Recorder::new(conf.viddir, conf.recorder.command, conf.mkvmerge);
-  let mut dirwatcher = DirWatcher::at(&conf.watchdir)?;
+  let (mut dirwatcher, tx) = DirWatcher::at(&conf.watchdir)?;
+
+  ctrlc::set_handler(move || {
+    tx.blocking_send(events::Event::CtrlC)
+      .expect("Ctrl-C channel");
+  })
+  .expect("Ctrl-C handler");
 
   while let Some(e) = dirwatcher.recv().await {
     println!("Event: '{e:?}'");
@@ -118,8 +125,10 @@ pub async fn main() -> Result<(), io::Error> {
           {
             recorder.stop_recording();
           } else {
-            println!("Got CHALLENGE_MODE_END, but no mythicplus recording \
-                      running");
+            println!(
+              "Got CHALLENGE_MODE_END, but no mythicplus recording \
+                      running"
+            );
           }
         }
         PlayerDeath(datetime, name) => {
@@ -130,6 +139,15 @@ pub async fn main() -> Result<(), io::Error> {
         IoErr(error) => {
           eprintln!("Error: '{}'", error);
           break;
+        }
+        CtrlC => {
+          if recorder.recording.is_none() {
+            println!("Caught Ctrl-C with no recording running. Exiting");
+            break;
+          }
+
+          println!("Caught Ctrl-C, stopping current recording");
+          recorder.stop_recording();
         }
       }
     }

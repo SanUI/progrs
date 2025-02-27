@@ -22,7 +22,7 @@ pub struct DirWatcher {
 }
 
 impl DirWatcher {
-  pub fn at(dir: &str) -> io::Result<Receiver<Event>> {
+  pub fn at(dir: &str) -> io::Result<(Receiver<Event>, Sender<Event>)> {
     let (tx, rx): (Sender<Event>, Receiver<Event>) = mpsc::channel(1);
 
     let dir: PathBuf = dir.into();
@@ -38,10 +38,10 @@ impl DirWatcher {
       file,
       filewatcher: None,
       fd,
-      sender: tx,
+      sender: tx.clone(),
     };
     tokio::spawn(dirwatcher.watch());
-    Ok(rx)
+    Ok((rx, tx))
   }
 
   async fn watch(mut self) {
