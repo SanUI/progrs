@@ -21,9 +21,7 @@ directory of your WoW installation) and `viddir` (the directory where the
 videos will end up). It is well commented, please look around and ajust as
 necessary.
 
-*Important*: Don't forget to enable advanced combat logging. For now, only
-"encounters" are supported, which does at least mean raid bosses, but might
-include M+ bosses.
+*Important*: Don't forget to enable advanced combat logging. Recording works for Raid bosses and M+ runs (if you don't finish a key but want to stop recording, hit `Ctrl-C` once).
 
 ## Contributing
 
