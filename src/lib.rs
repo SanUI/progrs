@@ -39,7 +39,7 @@ pub async fn main() -> Result<(), io::Error> {
   if !(fs::exists(&conffile)?) {
     println!(
       "Config file {} does not exist, creating with default values. \
-    Please adjust to your needs and run progrs again",
+       Please adjust to your needs and run progrs again",
       conffile.to_string_lossy()
     );
 
@@ -62,8 +62,12 @@ pub async fn main() -> Result<(), io::Error> {
     }
   };
 
-  let mut recorder =
-    Recorder::new(conf.viddir, conf.recorder.command, conf.mkvmerge);
+  let mut recorder = Recorder::new(
+    conf.viddir,
+    conf.recorder.command,
+    conf.recorder.args,
+    conf.mkvmerge,
+  );
   let (mut dirwatcher, tx) = DirWatcher::at(&conf.watchdir)?;
 
   ctrlc::set_handler(move || {

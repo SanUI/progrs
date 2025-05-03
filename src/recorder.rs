@@ -15,6 +15,7 @@ use crate::{config::executable, events::Event};
 pub struct Recorder {
   pub viddir: String,
   pub command: String,
+  pub args: Vec<String>,
   pub mkvmerge: Option<String>,
   pub recording: Option<Recording>,
 }
@@ -47,6 +48,7 @@ impl Recorder {
   pub fn new(
     viddir: String,
     command: String,
+    args: Vec<String>,
     mkvmerge: String,
   ) -> Self {
     let mut mkvm = None;
@@ -58,6 +60,7 @@ impl Recorder {
     Self {
       viddir,
       command,
+      args,
       mkvmerge: mkvm,
       recording: None,
     }
@@ -71,6 +74,7 @@ impl Recorder {
 
 
     let recorder = Command::new(&self.command)
+      /*
       .args(["-w", "DisplayPort-0"])
       .args(["-c", "mkv"])
       .args(["-k", "hevc"])
@@ -82,6 +86,8 @@ impl Recorder {
       .args(["-encoder", "gpu"])
       .args(["-q", "very_high"])
       .args(["-a", "device:default_output"])
+      */
+      .args(&self.args)
       .args(["-o", &format!("{viddir}/{filename}.mkv")])
       .stderr(Stdio::null())
       .stdin(Stdio::null())
