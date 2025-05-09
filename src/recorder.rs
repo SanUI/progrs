@@ -89,8 +89,8 @@ impl Recorder {
       */
       .args(&self.args)
       .args(["-o", &format!("{viddir}/{filename}.mkv")])
-      .stderr(Stdio::null())
-      .stdin(Stdio::null())
+      .stderr(Stdio::piped())
+      .stdin(Stdio::piped())
       .spawn()
       .expect("Spawning gpu-screen-recorder");
 
@@ -119,7 +119,11 @@ impl Recorder {
       )
       .expect("Killing process failed");
 
-      let exitstatus = process.wait().expect("Waiting for recorder exit");
+      let output = process.wait_with_output().expect("Waiting for recorder exit");
+      let exitstatus = output.status;
+
+      println!("Stdout: '{}'", String::from_utf8_lossy(&output.stdout));
+      println!("Stderr: '{}'", String::from_utf8_lossy(&output.stderr));
 
       if !exitstatus.success() {
         println!("Recorder exited with status {exitstatus}");
