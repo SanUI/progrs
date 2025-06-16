@@ -123,7 +123,13 @@ impl Recorder {
       let exitstatus = output.status;
 
       println!("Stdout: '{}'", String::from_utf8_lossy(&output.stdout));
-      println!("Stderr: '{}'", String::from_utf8_lossy(&output.stderr));
+      println!("Stderr:\n", );
+      for l in  String::from_utf8_lossy(&output.stderr).into_owned().lines().filter(|l|
+        (!l.contains("update fps") &&  !l.contains("damage fps")) ||
+        l.is_empty())
+      {
+        println!("'{l}'");
+      }
 
       if !exitstatus.success() {
         println!("Recorder exited with status {exitstatus}");
