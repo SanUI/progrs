@@ -4,7 +4,7 @@ use std::{
   process::{Child, Command, Stdio},
 };
 
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, TimeDelta};
 use nix::{
   sys::signal::{kill, Signal},
   unistd::Pid,
@@ -212,7 +212,11 @@ impl Recording {
     for (idx, event) in self.events.iter().enumerate() {
       match event {
         Event::PlayerDeath(time, name) => {
-          let tdelta = *time - *starttime;
+          // subtract 2s for more comfortable viewing
+          let tdelta = Ord::max(
+            TimeDelta::seconds(0),
+            *time - *starttime - TimeDelta::seconds(2)
+          );
           writeln!(
             &mut s,
             "CHAPTER{:02}={:02}:{:02}:{:02}.{:03}",
