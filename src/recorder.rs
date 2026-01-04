@@ -107,7 +107,7 @@ impl Recorder {
     let chapters = recording.create_chapters(&recording.starttime);
     let filename = recording.filename;
     let viddir = self.viddir.clone();
-    let mut process = recording.process;
+    let process = recording.process;
     let mkvmerge = self.mkvmerge.clone();
 
     tokio::spawn(async move {
